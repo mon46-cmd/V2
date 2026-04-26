@@ -1,0 +1,18 @@
+# ---------------------------------------------------------------------------
+# Development and testing dependencies.
+# Install with: pip install -r requirements-dev.txt
+# ---------------------------------------------------------------------------
+
+# Pull in all runtime deps first.
+-r requirements.txt
+
+# Test framework
+pytest>=8.0
+pytest-asyncio>=0.23
+pytest-timeout>=2.2
+
+# Linter / formatter
+ruff>=0.4
+
+# Static type checker
+mypy>=1.10

@@ -1,0 +1,30 @@
+# ---------------------------------------------------------------------------
+# Runtime dependencies.
+# Pin to minor versions; let patch releases float for security fixes.
+# Dev-only tools (pytest, ruff, mypy) belong in requirements-dev.txt.
+# ---------------------------------------------------------------------------
+
+# Async HTTP client (exchange REST + OpenRouter calls)
+aiohttp>=3.9
+
+# Fast JSON serialization / deserialization
+orjson>=3.10
+
+# Numerical arrays
+numpy>=1.26
+
+# Tabular data and time-series manipulation
+pandas>=2.2
+
+# Efficient columnar storage for candle cache
+pyarrow>=15
+
+# Data validation models (used for AI response schemas)
+pydantic>=2.6
+
+# .env file loader
+python-dotenv>=1.0
+
+# Internal REST API server
+fastapi>=0.110
+uvicorn[standard]>=0.29

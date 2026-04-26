@@ -1,0 +1,44 @@
+[project]
+requires-python = ">=3.12,<3.13"
+
+[build-system]
+requires      = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+minversion    = "8.0"
+testpaths     = ["tests"]
+asyncio_mode  = "auto"
+addopts       = "-ra --strict-markers -q"
+markers       = [
+    "live: hits the live Bybit public API (deselect with -m 'not live')",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]
+
+[tool.ruff]
+line-length    = 100
+target-version = "py312"
+
+[tool.mypy]
+python_version       = "3.12"
+mypy_path            = "src"
+files                = ["src"]
+namespace_packages   = true
+explicit_package_bases = true
+warn_unused_ignores  = true
+warn_return_any      = true
+warn_redundant_casts = true
+no_implicit_optional = true
+check_untyped_defs   = true
+# Tighten incrementally; flip these on once the codebase passes:
+# disallow_untyped_defs = true
+# disallow_incomplete_defs = true
+
+[[tool.mypy.overrides]]
+module = ["pandas", "pandas.*", "pyarrow", "pyarrow.*", "orjson", "aiohttp", "aiohttp.*"]
+ignore_missing_imports = true

@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trading Dashboard</title>
+<link rel="stylesheet" href="/style.css">
+<script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+</head>
+<body>
+<div class="shell">
+
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">◆</div>
+    <nav>
+      <button class="nb active" data-page="market">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        <span>Market</span>
+      </button>
+      <button class="nb" data-page="chart">
+        <svg viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        <span>Chart</span>
+      </button>
+      <button class="nb" data-page="portfolio">
+        <svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        <span>Portfolio</span>
+      </button>
+      <button class="nb" data-page="calls">
+        <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <span>AI Calls</span>
+      </button>
+      <button class="nb" data-page="logs">
+        <svg viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        <span>Logs</span>
+      </button>
+      <button class="nb" data-page="status">
+        <svg viewBox="0 0 24 24"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+        <span>Status</span>
+      </button>
+    </nav>
+    <div class="sidebar-foot">
+      <div class="sdot" id="sdot"></div>
+      <span class="smeta" id="smeta">—</span>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <div class="main">
+    <header class="topbar">
+      <span class="tbar-title" id="ptitle">Market</span>
+      <div class="tbar-mid" id="tbar-mid"></div>
+      <span class="tbar-time" id="tbar-time"></span>
+    </header>
+
+    <div class="pages">
+
+      <!-- MARKET -->
+      <div class="pg active" id="pg-market">
+        <div class="toolbar">
+          <div class="searchbox">
+            <svg viewBox="0 0 24 24" width="13" height="13"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input id="msearch" placeholder="Search…" autocomplete="off">
+          </div>
+          <div class="tabs" id="mtabs">
+            <button class="tab active" data-mf="all">All <b id="mcnt"></b></button>
+            <button class="tab" data-mf="ai">★ AI Picks</button>
+            <button class="tab" data-mf="up">Gainers</button>
+            <button class="tab" data-mf="dn">Losers</button>
+          </div>
+          <button class="icon-btn" id="mrefresh" title="Refresh">↻</button>
+        </div>
+        <div class="pair-grid" id="pgrid"></div>
+      </div>
+
+      <!-- CHART (never display:none — keeps chart DOM alive) -->
+      <div class="pg" id="pg-chart">
+        <div class="chart-wrap">
+          <div class="cside">
+            <input class="cside-search" id="csearch" placeholder="Filter pairs…" autocomplete="off">
+            <div class="cpairs" id="cpairs"></div>
+          </div>
+          <div class="cmain">
+            <div class="chart-hdr">
+              <div class="chart-info">
+                <span class="csym" id="csym">—</span>
+                <span class="cprc" id="cprc">—</span>
+                <span class="cchg" id="cchg"></span>
+                <span class="cai" id="cai"></span>
+              </div>
+              <div class="chart-hdr-right">
+                <div class="tfs">
+                  <button class="tfb" data-tf="1m">1m</button>
+                  <button class="tfb" data-tf="5m">5m</button>
+                  <button class="tfb active" data-tf="15m">15m</button>
+                  <button class="tfb" data-tf="1h">1h</button>
+                  <button class="tfb" data-tf="4h">4h</button>
+                  <button class="tfb" data-tf="1d">1D</button>
+                </div>
+                <div class="marker-toggles">
+                  <button class="mtog active" data-mtog="flags" title="Toggle flag markers">Flags</button>
+                  <button class="mtog active" data-mtog="ai" title="Toggle AI markers">AI</button>
+                </div>
+              </div>
+            </div>
+            <div id="chartbox"></div>
+            <!-- Flags + Indicators panel -->
+            <div class="flags-panel" id="flags-panel">
+              <div class="flags-hdr">Flags <span id="flags-sym"></span> <span id="flags-ts" style="color:var(--tx3);font-size:.68rem"></span></div>
+              <div class="flags-grid" id="flags-grid"><div class="loading-sm">Select a symbol</div></div>
+              <div class="indicators-row" id="ind-row"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- PORTFOLIO -->
+      <div class="pg" id="pg-portfolio">
+        <div class="portfolio-grid" id="port-kpis"></div>
+        <div class="port-sections">
+          <div class="port-col">
+            <div class="sec-hdr">Watched Symbols</div>
+            <div id="port-symbols"></div>
+          </div>
+          <div class="port-col">
+            <div class="sec-hdr">Equity Curve</div>
+            <div id="port-curve-box"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- AI CALLS -->
+      <div class="pg" id="pg-calls">
+        <div class="toolbar">
+          <div class="tabs">
+            <button class="tab active" data-cf="">All</button>
+            <button class="tab" data-cf="social_scan">Social</button>
+            <button class="tab" data-cf="analysis">Analysis</button>
+            <button class="tab" data-cf="review">Review</button>
+          </div>
+        </div>
+        <div class="table-box">
+          <table class="ctbl">
+            <thead><tr>
+              <th>Time</th><th>Type</th><th>Model</th><th>Symbol</th>
+              <th>Tokens</th><th>Cost</th><th>Latency</th><th>Preview</th>
+            </tr></thead>
+            <tbody id="ctbody"></tbody>
+          </table>
+        </div>
+        <div class="pager" id="pager"></div>
+      </div>
+
+      <!-- LOGS -->
+      <div class="pg" id="pg-logs">
+        <div class="toolbar">
+          <div class="tabs">
+            <button class="tab active" data-lf="">All</button>
+            <button class="tab" data-lf="INFO">Info</button>
+            <button class="tab" data-lf="WARNING">Warn</button>
+            <button class="tab" data-lf="ERROR">Error</button>
+          </div>
+          <label class="log-auto-label">
+            <input type="checkbox" id="log-auto" checked> Auto-scroll
+          </label>
+          <button class="icon-btn" id="log-refresh" title="Refresh">↻</button>
+        </div>
+        <div class="log-box" id="log-box"></div>
+      </div>
+
+      <!-- STATUS -->
+      <div class="pg" id="pg-status">
+        <div class="sgrid" id="sgrid"></div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Modal -->
+<div class="modal-bg" id="mbg">
+  <div class="modal">
+    <div class="modal-hdr">
+      <div class="modal-tags" id="mtags"></div>
+      <button class="modal-x" id="mx">✕</button>
+    </div>
+    <div class="modal-body" id="mbody"></div>
+  </div>
+</div>
+
+<script src="/app.js"></script>
+<script src="/app2.js"></script>
+</body>
+</html>

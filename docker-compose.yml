@@ -1,0 +1,107 @@
+# V8 production docker-compose -- two services, one image, shared volume.
+#
+#   engine     -- the autonomous trading loop (no inbound network).
+#   dashboard  -- read-only FastAPI dashboard exposing :8765.
+#
+# Both share /app/data via the named volume `app_data` so the dashboard
+# can read positions, audit logs and feature snapshots written by the
+# engine.
+#
+# Hardening defaults applied to both services:
+#   * non-root user (uid 10001 from the image)
+#   * read-only root filesystem (writes only to /app/data tmpfs)
+#   * no new privileges, dropped capabilities, no host network
+#   * memory + CPU limits (tune for your VPS)
+#   * JSON file log rotation (10MB x 5)
+#   * automatic restart with backoff
+#   * SIGTERM grace period for clean shutdown (positions saved to disk)
+
+x-common: &common
+  build:
+    context: .
+    dockerfile: Dockerfile
+  image: v8-trading:latest
+  env_file:
+    - .env
+  environment:
+    - PYTHONPATH=/app/src
+    - TZ=UTC
+  volumes:
+    - app_data:/app/data
+  restart: unless-stopped
+  stop_grace_period: 30s
+  init: false                      # tini already PID 1 inside the image
+  read_only: true
+  tmpfs:
+    - /tmp:size=64m,mode=1777
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  ulimits:
+    nofile:
+      soft: 65536
+      hard: 65536
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "5"
+
+services:
+
+  # -------------------------------------------------------------------------
+  # Trading engine: scans, opens/closes paper positions, writes audit logs.
+  # No inbound ports. Restarts on failure with exponential backoff.
+  # -------------------------------------------------------------------------
+  engine:
+    <<: *common
+    container_name: v8-engine
+    command: ["python", "-m", "loops.runner"]
+    # Engine has no HTTP surface; do a process-existence check.
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'loops.runner' >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    deploy:
+      resources:
+        limits:
+          cpus: "1.5"
+          memory: 1g
+        reservations:
+          memory: 256m
+
+  # -------------------------------------------------------------------------
+  # Dashboard: read-only FastAPI app.  Bind to 127.0.0.1 by default; put
+  # behind nginx + Let's Encrypt for any public exposure.
+  # -------------------------------------------------------------------------
+  dashboard:
+    <<: *common
+    container_name: v8-dashboard
+    command: ["python", "-m", "web_api.app", "--host", "0.0.0.0", "--port", "8765"]
+    depends_on:
+      engine:
+        condition: service_started
+    ports:
+      - "${API_BIND:-127.0.0.1}:${API_PORT:-8765}:8765"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8765/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 384m
+
+# ---------------------------------------------------------------------------
+# Named volume so `docker compose down` does not wipe runtime data.
+# Use `docker compose down -v` only when a full reset is intended.
+# ---------------------------------------------------------------------------
+volumes:
+  app_data:
+    driver: local

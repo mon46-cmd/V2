@@ -1,0 +1,39 @@
+# /etc/systemd/system/v8.service
+#
+# systemd alternative to running `docker compose up -d` manually.
+# Brings the whole compose stack up at boot and restarts it on failure.
+#
+# Install:
+#   sudo cp deploy/systemd/v8.service /etc/systemd/system/v8.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now v8.service
+#
+# Logs:
+#   journalctl -u v8.service -f
+#   docker compose -f /opt/v8/docker-compose.yml logs -f
+
+[Unit]
+Description=V8 trading stack (docker compose)
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/v8
+EnvironmentFile=/opt/v8/.env
+
+# Pull is optional; comment out if you build locally only.
+ExecStartPre=/usr/bin/docker compose pull --ignore-pull-failures
+ExecStart=/usr/bin/docker compose up -d --remove-orphans
+ExecStop=/usr/bin/docker compose down
+
+# Hardening
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
