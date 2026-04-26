@@ -30,7 +30,7 @@ x-common: &common
     - app_data:/app/data
   restart: unless-stopped
   stop_grace_period: 30s
-  init: false                      # tini already PID 1 inside the image
+  init: true                       # docker-init (tini) as PID 1; image has no tini
   read_only: true
   tmpfs:
     - /tmp:size=64m,mode=1777
@@ -87,7 +87,11 @@ services:
     ports:
       - "${API_BIND:-127.0.0.1}:${API_PORT:-8765}:8765"
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8765/health"]
+      test:
+        - "CMD"
+        - "python"
+        - "-c"
+        - "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8765/health', timeout=5).status==200 else 1)"
       interval: 30s
       timeout: 5s
       retries: 3
