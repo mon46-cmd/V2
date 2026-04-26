@@ -27,8 +27,11 @@ import asyncio
 import logging
 from datetime import datetime, timedelta, timezone
 
+import aiohttp
 import pandas as pd
 
+from ai.audit import AuditLog
+from ai.budget import BudgetTracker
 from ai.calls.context_builder import build_deep_context, build_review_context
 from ai.calls.deep_analysis import chat_deep_analysis
 from ai.calls.position_review import chat_position_review
@@ -87,6 +90,13 @@ class Scanner:
         self._broker     = PaperBroker(cfg)
         self._risk       = RiskEngine(cfg)
         self._review_cnt: dict[str, int] = {}   # symbol → bars since last review
+        # Persistent across ticks: budget cap survives restarts via state file,
+        # audit log appends every AI call to data/runs/audit.jsonl.
+        self._budget     = BudgetTracker(
+            daily_cap_usd=cfg.daily_budget_usd,
+            state_path=cfg.run_root / "budget.json",
+        )
+        self._audit      = AuditLog(cfg)
 
     # ── Entry ──────────────────────────────────────────────────────────────
 
@@ -116,32 +126,43 @@ class Scanner:
 
         async with HttpClient(self._cfg) as http:
             rest    = RestClient(http, self._cfg)
-            ai      = AIClient(self._cfg)
-            builder = UniverseBuilder(self._cfg, rest)
-
-            # 1. Open position updates (run first — SL/TP may fire on this bar)
-            for sym in list(self._broker.open_symbols):
-                await self._process_open(sym, rest=rest, ai=ai)
-
-            # 2. Maybe refresh watchlist
-            await self._maybe_social_scan(rest=rest, ai=ai, builder=builder)
-
-            watchlist = self._watchlist.symbols()
-            if not watchlist:
-                log.warning("watchlist empty — nothing to scan")
-                return
-
-            # 3. Trigger scan on watchlist symbols (skip already-open ones)
-            if self._broker.is_halted():
-                log.warning(
-                    "DRAWDOWN HALT active (dd=%.2f%%) -- skipping new entry scan; existing positions still managed",
-                    self._broker.drawdown_pct * 100,
+            # Dedicated aiohttp session for OpenRouter calls. Kept separate
+            # from the exchange HttpClient so connection pools / timeouts
+            # don't interfere. Skipped entirely when running in offline /
+            # dry-run mode (AIClient handles that itself).
+            ai_timeout = aiohttp.ClientTimeout(total=60)
+            async with aiohttp.ClientSession(timeout=ai_timeout) as ai_session:
+                ai = AIClient(
+                    self._cfg,
+                    session=ai_session,
+                    budget=self._budget,
+                    audit=self._audit,
                 )
-            else:
-                for sym in watchlist:
-                    if sym in self._broker.open_symbols:
-                        continue
-                    await self._scan(sym, rest=rest, ai=ai)
+                builder = UniverseBuilder(self._cfg, rest)
+
+                # 1. Open position updates (run first — SL/TP may fire on this bar)
+                for sym in list(self._broker.open_symbols):
+                    await self._process_open(sym, rest=rest, ai=ai)
+
+                # 2. Maybe refresh watchlist
+                await self._maybe_social_scan(rest=rest, ai=ai, builder=builder)
+
+                watchlist = self._watchlist.symbols()
+                if not watchlist:
+                    log.warning("watchlist empty — nothing to scan")
+                    return
+
+                # 3. Trigger scan on watchlist symbols (skip already-open ones)
+                if self._broker.is_halted():
+                    log.warning(
+                        "DRAWDOWN HALT active (dd=%.2f%%) -- skipping new entry scan; existing positions still managed",
+                        self._broker.drawdown_pct * 100,
+                    )
+                else:
+                    for sym in watchlist:
+                        if sym in self._broker.open_symbols:
+                            continue
+                        await self._scan(sym, rest=rest, ai=ai)
 
         self._save()
 
